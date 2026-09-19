@@ -1,0 +1,7 @@
+FastAPI is a modern web framework for building APIs with Python.
+
+It is based on standard Python type hints.
+
+Key features are speed, fewer bugs, and automatic interactive docs.
+
+Pydantic handles the data validation layer.

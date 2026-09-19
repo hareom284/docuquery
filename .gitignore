@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 scratch/summary.txt
+
+# macOS
+.DS_Store

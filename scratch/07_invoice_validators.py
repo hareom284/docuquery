@@ -31,7 +31,6 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
-
 # TODO: your code here
 RAW = {
     "invoice_no": "INV-2026-001",

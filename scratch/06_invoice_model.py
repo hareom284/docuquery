@@ -23,7 +23,6 @@ DONE WHEN
   The valid invoice prints, and the bad one raises a ValidationError that you catch.
 """
 
-from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 

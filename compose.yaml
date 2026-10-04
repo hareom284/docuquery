@@ -1,0 +1,37 @@
+# Day 5 — the API plus the Postgres that Day 6 will use.
+#
+#   docker compose up --build        start both
+#   docker compose ps                what is running
+#   docker compose logs -f api       follow the API logs
+#   docker compose down              stop (add -v to delete the database volume)
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"          # host:container
+    environment:
+      # inside the compose network, the hostname is the service name — "db", not localhost
+      DATABASE_URL: postgresql+psycopg://docuquery:docuquery@db:5432/docuquery
+    depends_on:
+      db:
+        condition: service_healthy    # wait until Postgres really answers, not just "started"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docuquery
+      POSTGRES_PASSWORD: docuquery
+      POSTGRES_DB: docuquery
+    ports:
+      - "5432:5432"          # so you can connect from your Mac with psql/TablePlus
+    volumes:
+      - pgdata:/var/lib/postgresql/data    # named volume = data survives `down`
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docuquery"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

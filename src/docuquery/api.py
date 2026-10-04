@@ -26,6 +26,7 @@ Run the tests with:  uv run pytest -q
 """
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -80,6 +81,11 @@ def get_store() -> InMemoryStore:
     return _store
 
 
+# The dependency lives in the TYPE, not in the default value. Same behaviour as
+# `store: InMemoryStore = Depends(get_store)`, but reusable and lint-clean (B008).
+StoreDep = Annotated[InMemoryStore, Depends(get_store)]
+
+
 # ---------------------------------------------------------------- routes
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -88,13 +94,13 @@ def health() -> dict[str, str]:
 
 
 @app.post("/documents", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
-def create_document(payload: DocumentIn, store: InMemoryStore = Depends(get_store)) -> DocumentOut:
+def create_document(payload: DocumentIn, store: StoreDep) -> DocumentOut:
     # TODO: return store.add(payload)
     return store.add(payload)
 
 
 @app.get("/documents/{doc_id}", response_model=DocumentOut)
-def read_document(doc_id: str, store: InMemoryStore = Depends(get_store)) -> DocumentOut:
+def read_document(doc_id: str, store: StoreDep) -> DocumentOut:
     # TODO: document = store.get(doc_id)
     document = store.get(doc_id)
     if document is None:

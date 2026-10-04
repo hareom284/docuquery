@@ -68,7 +68,7 @@ async def blocking_worker(client: httpx.AsyncClient, i: int) -> int:
     #       time.sleep(1)        <- blocking: never gives the loop back
     #       return response.status_code
     response = await client.get(URL, timeout=30)
-    time.sleep(1)  # blocking: never gives the loop back
+    time.sleep(1)  # noqa: ASYNC251 — deliberately blocking: this is the Day 3 experiment
     return response.status_code
 
 

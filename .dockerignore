@@ -1,0 +1,12 @@
+# Keep the build context small and never ship local junk into the image.
+.venv
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+scratch
+tests
+.DS_Store
+.env

@@ -31,6 +31,10 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from docuquery.db import get_session
+from docuquery.models import Document
 
 app = FastAPI(title="DocuQuery", version="0.1.0")
 
@@ -52,15 +56,12 @@ class DocumentOut(DocumentIn):
 
 # ---------------------------------------------------------------- store
 class InMemoryStore:
-    """Stands in for a database until Day 6."""
+    """Day 4's store. Kept as the fake that tests inject."""
 
     def __init__(self) -> None:
         self._documents: dict[str, DocumentOut] = {}
 
     def add(self, document: DocumentIn) -> DocumentOut:
-        # TODO: build a DocumentOut with a new id (str(uuid4())) and
-        #       created_at=datetime.now(timezone.utc), save it in self._documents,
-        #       and return it.
         created_at = datetime.now(UTC)
         doc_id = str(uuid4())
         document_out = DocumentOut(id=doc_id, created_at=created_at, **document.model_dump())
@@ -68,22 +69,37 @@ class InMemoryStore:
         return document_out
 
     def get(self, doc_id: str) -> DocumentOut | None:
-        # TODO: return the document, or None when the id is unknown.
-        #       Remember Day 1: d[key] raises KeyError, d.get(key) returns None.
+        # Day 1: d[key] raises KeyError, d.get(key) returns None.
         return self._documents.get(doc_id)
 
 
-_store = InMemoryStore()
+class SqlStore:
+    """The real store, backed by one request-scoped Session."""
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, document: DocumentIn) -> DocumentOut:
+        row = Document(id=str(uuid4()), **document.model_dump())
+        self.session.add(row)     # staged only
+        self.session.commit()     # now it is written
+        self.session.refresh(row)  # re-read, so the DB-generated created_at comes back
+        return DocumentOut.model_validate(row, from_attributes=True)
+
+    def get(self, doc_id: str) -> DocumentOut | None:
+        row = self.session.get(Document, doc_id)
+        # from_attributes: build the API model by reading attributes off the ORM row
+        return DocumentOut.model_validate(row, from_attributes=True) if row else None
 
 
-def get_store() -> InMemoryStore:
+def get_store(session: Annotated[Session, Depends(get_session)]) -> SqlStore:
     """The dependency. Tests swap this out with app.dependency_overrides."""
-    return _store
+    return SqlStore(session)
 
 
 # The dependency lives in the TYPE, not in the default value. Same behaviour as
-# `store: InMemoryStore = Depends(get_store)`, but reusable and lint-clean (B008).
-StoreDep = Annotated[InMemoryStore, Depends(get_store)]
+# `store: SqlStore = Depends(get_store)`, but reusable and lint-clean (B008).
+StoreDep = Annotated[SqlStore, Depends(get_store)]
 
 
 # ---------------------------------------------------------------- routes

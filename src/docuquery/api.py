@@ -25,12 +25,15 @@ DONE WHEN
 Run the tests with:  uv run pytest -q
 """
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from docuquery.db import get_session
@@ -72,6 +75,10 @@ class InMemoryStore:
         # Day 1: d[key] raises KeyError, d.get(key) returns None.
         return self._documents.get(doc_id)
 
+    def list_all(self) -> list[DocumentOut]:
+        # .values() gives the documents (not the ids); list() makes it a real list
+        return list(self._documents.values())
+
 
 class SqlStore:
     """The real store, backed by one request-scoped Session."""
@@ -90,6 +97,11 @@ class SqlStore:
         row = self.session.get(Document, doc_id)
         # from_attributes: build the API model by reading attributes off the ORM row
         return DocumentOut.model_validate(row, from_attributes=True) if row else None
+
+    def list_all(self) -> list[DocumentOut]:
+        # select(Document) is "SELECT * FROM documents"; scalars().all() runs it
+        rows = self.session.scalars(select(Document)).all()
+        return [DocumentOut.model_validate(row, from_attributes=True) for row in rows]
 
 
 def get_store(session: Annotated[Session, Depends(get_session)]) -> SqlStore:
@@ -122,3 +134,15 @@ def read_document(doc_id: str, store: StoreDep) -> DocumentOut:
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@app.get("/stream")
+async def stream_documents(store: StoreDep):
+    async def stream():
+        # ask the STORE for every document, then ask EACH document for its JSON
+        for document in store.list_all():
+            yield f"data: {document.model_dump_json()}\n\n"
+            await asyncio.sleep(0.1)  # pause so the client sees them arrive one by one
+        yield "data: [DONE]\n\n"  # a sentinel so the client knows the stream ended
+
+    return StreamingResponse(stream(), media_type="text/event-stream")

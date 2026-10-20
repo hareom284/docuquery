@@ -38,7 +38,7 @@ def db_session():
     """
     try:
         connection = engine.connect()
-    except Exception as exc:  # no Postgres running
+    except Exception as exc:  # noqa: BLE001 — any connection failure means "skip", not "fail"
         pytest.skip(f"database not reachable: {exc}")
 
     transaction = connection.begin()
@@ -55,4 +55,4 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "db: test that needs a real database")
 
 
-__all__ = ["fake_store", "db_session", "text"]
+__all__ = ["db_session", "fake_store", "text"]
